@@ -35,3 +35,7 @@ func (d *Date) ParseString(str string) error {
 	*d = Date(t)
 	return nil
 }
+
+func (d *Date) Equal(date Date) bool {
+	return d.Format("2006-01-02") == date.Format("2006-01-02")
+}
