@@ -5,12 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
-	package_core "go-young_astrologer/package-core"
 	"go-young_astrologer/package-core/scalar"
 	"go-young_astrologer/service-api/application/controllers"
+	"go-young_astrologer/service-api/application/services"
+	"go-young_astrologer/service-api/core"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 func init() {
@@ -24,11 +26,29 @@ func init() {
 }
 
 func main() {
-	core, err := package_core.NewCore()
+	core, err := core.NewCore()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	go func() {
+		apodPreloadService := services.NewPreloadService(core)
+
+		for {
+			err = apodPreloadService.Run()
+			if err != nil {
+				log.Fatal(err)
+			}
+			<-time.After(time.Second * 10)
+		}
+	}()
+
+	router(core)
+
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(core.Config.ServerPort), nil))
+}
+
+func router(core *core.Core) {
 	http.HandleFunc("/nasa/apod", func(w http.ResponseWriter, r *http.Request) {
 		controller := controllers.NewNasaController(core)
 		resp, err := controller.ApodAction()
@@ -73,6 +93,4 @@ func main() {
 			return
 		}
 	})
-
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(core.Config.ServerPort), nil))
 }
