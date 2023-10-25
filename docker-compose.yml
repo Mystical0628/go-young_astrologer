@@ -1,0 +1,71 @@
+version: "3"
+services:
+  postgres_db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=astrologer
+      - POSTGRES_PASSWORD=12345678
+    ports:
+      - "9432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  proxy:
+    image: nginx:latest
+    ports:
+      - "9081:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    links:
+      - postgres_db
+      - service-nasa
+      - service-api
+
+
+  service-nasa:
+    build:
+      context: ./service-nasa
+    volumes:
+      - ./service-nasa/service-nasa:/usr/local/bin/app
+      - ./package-core/.env.docker:/usr/local/bin/.env
+    command: app -config /usr/local/bin/.env Apod/SaveImage
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      service-migrations:
+        condition: service_completed_successfully
+
+
+  service-api:
+    build:
+      context: ./service-api
+    volumes:
+      - ./service-api/service-api:/usr/local/bin/app
+      - ./package-core/.env.docker:/usr/local/bin/.env
+    command: app -config /usr/local/bin/.env
+
+
+  service-migrations:
+    build:
+      context: ./service-migrations
+      args:
+        - DB_DRIVER=postgres
+        - DB_HOST=postgres_db
+        - DB_PORT=5432
+        - DB_USER=astrologer
+        - DB_PASSWORD=12345678
+    volumes:
+      - ./service-migrations/migrations:/usr/src/migrations
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+
+volumes:
+  db-data:
